@@ -677,6 +677,14 @@ class HttpSensor(BaseSensorOperator):
             method=method,
             http_conn_id=http_conn_id)
 
+    def check_response(self, response, context):
+        """ Checks the HTTP response, using the class's response_check
+            attribute.  Override this method in a subclass if your
+            response_check method requires access to the state of the
+            sensor object, to the task context, etc.
+        """
+        return (self.response_check is None) or self.response_check(response)
+
     def poke(self, context):
         self.log.info('Poking: %s', self.endpoint)
         try:
@@ -684,9 +692,8 @@ class HttpSensor(BaseSensorOperator):
                                      data=self.request_params,
                                      headers=self.headers,
                                      extra_options=self.extra_options)
-            if self.response_check:
-                # run content check on response
-                return self.response_check(response)
+
+            return self.check_response(response, context)
         except AirflowException as ae:
             if str(ae).startswith("404"):
                 return False
