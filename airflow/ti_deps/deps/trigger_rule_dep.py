@@ -23,6 +23,7 @@ import airflow
 from airflow.ti_deps.deps.base_ti_dep import BaseTIDep
 from airflow.utils.db import provide_session
 from airflow.utils.state import State
+from airflow.exceptions import AirflowConfigException
 
 
 class TriggerRuleDep(BaseTIDep):
@@ -138,7 +139,8 @@ class TriggerRuleDep(BaseTIDep):
         # bundled together for efficiency.
         # handling instant state assignment based on trigger rules
         if flag_upstream_failed:
-            if tr == TR.ALL_SUCCESS:
+            if tr == TR.ALL_SUCCESS and (
+                    upstream_done or not self._lazily_mark_upstream_failed()):
                 if upstream_failed or failed:
                     ti.set_state(State.UPSTREAM_FAILED, session)
                 elif skipped:
@@ -197,3 +199,15 @@ class TriggerRuleDep(BaseTIDep):
         else:
             yield self._failing_status(
                 reason="No strategy to evaluate trigger rule '{0}'.".format(tr))
+
+    @staticmethod
+    def _lazily_mark_upstream_failed():
+        result = False
+        try:
+            result = airflow.configuration.get(
+                'scheduler',
+                'lazily_mark_upstream_failed')
+        except AirflowConfigException:
+            pass
+
+        return result
